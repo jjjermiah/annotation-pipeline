@@ -2,7 +2,7 @@
 library(data.table)
 library(AnnotationGx)
 
-devtools::install_github("bhklab/AnnotationGx", ref = "jermiah", dependencies = TRUE, upgrade="never")
+# devtools::install_github("bhklab/AnnotationGx", ref = "jermiah", dependencies = TRUE, upgrade="never")
 # get snakemake output
 outputfile <- snakemake@output[['pubchem_annotation_db']]
 
@@ -11,8 +11,6 @@ query <- snakemake@wildcards[['query']]
 
 # get the params
 # params <- snakemake@params[['query_type']]
-raw <- snakemake@params[['raw']]
-rawAnnotationDT <- snakemake@params[['rawAnnotationDT']]
 
 # get snakemake number of threads
 threads <- snakemake@threads
@@ -24,21 +22,24 @@ threads <- snakemake@threads
 #     )
 # )
 # AnnotationGx::getPubChemAnnotations
-
+maxPages <- as.numeric(snakemake@params[['maxPages']])
+if (is.na(maxPages) | maxPages == "") maxPages <- Inf
+print(maxPages)
 
 result <- 
     AnnotationGx::getPubChemAnnotations(
         header=query, 
-        raw = raw, 
-        rawAnnotationDT = TRUE, 
+        raw = as.logical(snakemake@params[['raw']]), 
+        rawAnnotationDT = as.logical(snakemake@params[['rawAnnotationDT']]), 
         BPPARAM = BiocParallel::MulticoreParam(workers=threads, progressbar = TRUE),
-        verbose = TRUE)
+        verbose = TRUE,
+        maxPages = maxPages)
 
 saveRDS(result, outputfile)
 # headers <- AnnotationGx::getPubChemAnnotations()
 # headers <- headers[Type == "Compound"]
 
-# headers[Heading %like% 'ATC' 
+# headers[Heading %like% 'ATC'          ``
 #     | Heading %like% 'NSC' 
 #     | Heading %like% 'CAS' 
 #     | Heading %like% 'Drug Induced' 

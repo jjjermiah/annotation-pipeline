@@ -8,12 +8,12 @@ library(Cellosaurus)
 # branch: "jermiah"
 # commitid: 634db68
 #
-# install.packages("devtools")
-# devtools::install_github("bhklab/AnnotationGx@634db68", ref = "jermiah")
-devtools::install_github("bhklab/AnnotationGx@634db68", ref = "jermiah", dependencies = TRUE, upgrade="never")
-library(AnnotationGx)
+# if AnnotationGx isn't installed, install using devtools
+if (!require("AnnotationGx")) {
+    devtools::install_github("bhklab/AnnotationGx@634db68", ref = "jermiah", dependencies = TRUE, upgrade="never")
+    library(AnnotationGx)
+}
 
-AnnotationGx::getCellosaurusAPI
 # get snakemake input and output files
 inputfiles <- snakemake@input[['sample_Cellosaurus_file']]
 cellosaurus_object <- snakemake@input[['cellosaurus_object']]

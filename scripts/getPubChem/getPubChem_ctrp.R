@@ -4,11 +4,11 @@ library(AnnotationGx)
 # 
 
 # get snakemake input and output files
-inputfile <- snakemake@input[['dataset_annotation_file']]
-outputfile <- snakemake@output[['treatment_Pubchem_data']]
-dataset_name <- snakemake@wildcards[['dataset']]
+inputfile <- snakemake@input[['dataset_annotation_file']]   # dataset specific annotation file
+outputfile <- snakemake@output[['treatment_Pubchem_data']]  # output file
+dataset_name <- snakemake@wildcards[['dataset']]            # dataset name
 
-ctrp_treatment_meta <- as.data.table(read.delim(inputfile, header=TRUE, sep="\t"))
+ctrp_treatment_meta <- data.table::as.data.table(read.delim(inputfile, header=TRUE, sep="\t"))
 # Check for matches differing only by case, spaces, or the following characters:
 # possible list of bad characters:
 #  - "(", ")", "[", "]", "{", "}", "<", ">", "/", "\\", "|", "?", "*", "+", ".", "^", "$"
@@ -29,41 +29,28 @@ cleanTreatmentNames <- function(name){
 
     # remove substring of curly brackets and contents
     name <- gsub("\\s*\\{.*\\}", "", name)
-
-    # # remove colon and replace with no space
-    # name <- gsub(":", "", name)
-
-    # # remove hyphen and replace with no space
-    # name <- gsub("-", "", name)
-
-    # # remove plus and replace with no space
-    # name <- gsub("\\+", "", name)
-
-    # # remove asterisk and replace with no space
-    # name <- gsub("\\*", "", name)
-
-    # remove all spaces
-    # name <- gsub("\\s", "", name)
-
     name
 }
 
-treatments <- as.data.table(sapply(ctrp_treatment_meta$cpd_name, cleanTreatmentNames),keep.rownames=T)
+treatments <- data.table::as.data.table(sapply(ctrp_treatment_meta$cpd_name, cleanTreatmentNames),keep.rownames=T)
 names(treatments) <- c("cpd_name", "treatment_name_cleaned")
 ctrp_treatment_meta <- merge(ctrp_treatment_meta, treatments, by = "cpd_name")
 
-# BiocParallel::register(BiocParallel::SerialParam())
-BiocParallel::register(BiocParallel::MulticoreParam(workers=1))
-
+THREADS <- snakemake@threads
 
 ## ----------------- getPubChemCompound using all names ----------------- ##
-print("running getPubChemCompound using all names")
+verbose <- F
+
+message("running getPubChemCompound using all names")
 compound_nameToCIDS <- 
     AnnotationGx::getPubChemCompound(
         ctrp_treatment_meta$treatment_name_cleaned, 
         from='name', 
         to='cids', 
-        batch = FALSE)
+        batch = FALSE,
+        verbose = verbose,
+        BPPARAM = BiocParallel::MulticoreParam(workers = THREADS, progressbar = TRUE, stop.on.error = FALSE)
+    )
 
 compound_nameToCIDS <- compound_nameToCIDS[!duplicated(name), ]
 
@@ -81,6 +68,8 @@ failed_dt <- merge(
     by.y = "query")
 
 ## ----------------- getPubChemSubstance using all failed names ----------------- ##
+message("running getPubChemSubstance using failed names")
+
 substancenameToCIDS <- 
     AnnotationGx::getPubChemSubstance(
         failed_dt$treatment_name_cleaned, 
@@ -89,6 +78,7 @@ substancenameToCIDS <-
         batch = FALSE)
 
 substancenameToCIDS <- substancenameToCIDS[!duplicated(name), ]
+message("running getPubChemSubstance using failed names")
 
 substance_successful_dt <- merge(
     ctrp_treatment_meta, 
@@ -104,14 +94,19 @@ substance_failed_dt <- merge(
     rbindlist(attributes(substancenameToCIDS)$failed, fill = TRUE), 
     by.x = "treatment_name_cleaned", 
     by.y = "query")
+message("running getPubChemSubstance using failed names")
 
 ## ----------------- getPubChemCompound using SMILES from failed ----------------- ##
+message("running getPubChemCompound using SMILES from remaining failed.")
 smilesToCIDS <- 
     AnnotationGx::getPubChemCompound(
         substance_failed_dt$cpd_smiles, 
         from='smiles', 
         to='cids', 
-        batch = FALSE)
+        batch = FALSE,
+        verbose = verbose,
+        BPPARAM = BiocParallel::MulticoreParam(workers = THREADS, progressbar = TRUE, stop.on.error = FALSE)
+    )
 
 smilesToCIDS <- smilesToCIDS[!duplicated(smiles), ]
 
@@ -151,3 +146,4 @@ ctrp_cids <- list(
 
 # save the object as an RDS file
 saveRDS(ctrp_cids, outputfile)
+

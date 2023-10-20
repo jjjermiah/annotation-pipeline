@@ -1,5 +1,5 @@
 
-
+from os.path import join
 # manually create the dictionary for each project's annotation file
 # TODO:: moved into config.yaml file later
 dataset_annotation_dict = {
@@ -16,57 +16,18 @@ dataset_annotation_dict = {
         'treatment': 'rawdata/gdsc/screened_compounds_rel_8.4.csv'
     }
 }
-# headers[Heading %like% 'ATC']
-# CIDtoATC <- AnnotationGx::getPubChemAnnotations('ATC Code', raw = FALSE, rawAnnotationDT = TRUE)
 
-# headers[Heading %like% 'NSC']
-# CIDtoNSC <- AnnotationGx::getPubChemAnnotations('NSC Number', raw = FALSE, rawAnnotationDT = TRUE)
-
-# headers[Heading %like% 'ChEMBL']
-# CIDtoChEMBL <- AnnotationGx::getPubChemAnnotations('ChEMBL ID', raw = FALSE, rawAnnotationDT = TRUE)
-
-# headers[Heading %like% 'Drug Induced']
-# CIDtoDILI <- AnnotationGx::getPubChemAnnotations('Drug Induced Liver Injury',raw = FALSE, rawAnnotationDT = TRUE)
-
-# headers[Heading %like% 'CAS']
-# CIDtoCAS <- AnnotationGx::getPubChemAnnotations('CAS', raw = FALSE, rawAnnotationDT = TRUE)
-
-# headers[Heading %like% 'FDA Approved Drugs']
-# CIDtoFDA <- AnnotationGx::getPubChemAnnotations('FDA Approved Drugs', raw = FALSE, rawAnnotationDT = TRUE)
-
-# headers[Heading %like% 'Syn']
-# CIDtoNamesAndSyn <- AnnotationGx::getPubChemAnnotations('Names and Synonyms', raw = FALSE, rawAnnotationDT = TRUE)
-# CIDtoSynAndIDs <- AnnotationGx::getPubChemAnnotations('Synonyms and Identifiers', raw = FALSE, rawAnnotationDT = TRUE)
-
-
-pubchemAnnotationQueries = [
-    'ATC Code', 'NSC Number', 
-    'ChEMBL ID', 'Drug Induced Liver Injury', 
-    'CAS', 'FDA Approved Drugs', 
-    'Names and Synonyms', 'Synonyms and Identifiers']
-
+pubchemAnnotationQueries = ['ATC Code', 'NSC Number', 'ChEMBL ID', 'Drug Induced Liver Injury', 'CAS']
+DATASETS = "ctrp" #["ccle", "ctrp", "gdsc"]
 rule all:
     input:
-        # sampleInfo_file = expand("results/{dataset}/sample_metadata.RDS", dataset = dataset_annotation_dict.keys()),
-        pubchem_annotation_dbs = expand("metadata/pubchem_annotations_{query}.RDS", query = pubchemAnnotationQueries[2]),
-        # treatmentInfo_file = expand("results/{dataset}/treatment_metadata.RDS", dataset = 'ctrp'),
+        treatmentMetadata = expand("procdata/{dataset}/pubchem_annotations_all.csv", dataset = DATASETS), #"results/ctrp/treatment_metadata.RDS",
+        sampleMetadata = expand("results/ctrp/sample_metadata.RDS", dataset = "ctrp"),
 
-rule getCellosaurus_annotation:
-    input:
-        dataset_annotation_file = lambda wildcards: dataset_annotation_dict[wildcards.dataset]['sample'],
-        cellosaurus_object = "metadata/cellosaurus.RDS", 
-    output:
-        sample_Cellosaurus_file = "procdata/{dataset}/sample_Cellosaurus.csv",
-    conda:
-        "envs/sample_annotation.yaml",
-    script:
-        "scripts/getCellosaurus_{wildcards.dataset}.R"
-
-rule getSampleMetadata:
+rule combineSampleCellosaurusMetadata:
     input:
         sample_Cellosaurus_file = "procdata/{dataset}/sample_Cellosaurus.csv",
         cellosaurus_object = "metadata/cellosaurus.RDS", 
-        # sample_Cellosaurus_file = expand("procdata/{dataset}/sample_Cellosaurus.csv", dataset = dataset_annotation_dict.keys())
     output:
         sampleInfo_file = "results/{dataset}/sample_metadata.RDS",
     conda:
@@ -80,38 +41,83 @@ rule getCellosaurusObject:
     conda:
         "envs/sample_annotation.yaml",
     script:
-        "scripts/getCellosaurusObject.R"
+        "scripts/getCellosaurus/getCellosaurusObject.R"
 
-rule getPubchemAnnotationQueryDatabase:
+rule mapSampleNamesToCellosaurusAccessionID:
+    input:
+        dataset_annotation_file = lambda wildcards: dataset_annotation_dict[wildcards.dataset]['sample'],
+        cellosaurus_object = "metadata/cellosaurus.RDS", 
     output:
-        pubchem_annotation_db = "metadata/pubchem_annotations_{query}.RDS",
+        sample_Cellosaurus_file = "procdata/{dataset}/sample_Cellosaurus.csv",
     conda:
         "envs/sample_annotation.yaml",
-    threads:
-        8
-    params:
-        raw = "FALSE",
-        rawAnnotationDT = "TRUE",
     script:
-        "scripts/getPubchemAnnotations.R"
+        "scripts/getCellosaurus/getCellosaurus_{wildcards.dataset}.R"
 
-rule getPubchem_Annotation:
+rule combinePubchemAnnotations:
+    input:
+        pubchem_annotation_db = expand("procdata/{dataset}/pubchem_annotations_{annotationType}.RDS", dataset = DATASETS,  annotationType = pubchemAnnotationQueries),
+        pubchem_properties = "procdata/{dataset}/pubchem_properties.RDS"
+    output:
+        pubchemTreatmentAll = "procdata/{dataset}/pubchem_annotations_all.csv"
+    conda:
+        "envs/sample_annotation.yaml",
+    script:
+        "scripts/getPubChem/combinePubchemAnnotations.R"
+
+rule getExternalAnnotationFromCID:
+    input:
+        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
+    output:
+        pubchem_annotation_dbs = "procdata/{dataset}/pubchem_annotations_{annotationType}.RDS"
+    threads: 10
+    conda:
+        "envs/sample_annotation.yaml",
+    script:
+        "scripts/getPubChem/getPubchemAnnotation.R"
+
+rule getPropertiesFromCID:
+    input:
+        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
+    output:
+        pubchem_properties = "procdata/{dataset}/pubchem_properties.RDS"
+    threads: 10
+    conda:
+        "envs/sample_annotation.yaml",
+    script:
+        "scripts/getPubChem/getPubchemProperties.R"
+
+rule mapTreatmentNamesToPubchemCID:
     input:
         dataset_annotation_file = lambda wildcards: dataset_annotation_dict[wildcards.dataset]['treatment']
     output:
-        treatment_Pubchem_data = "results/{dataset}/pubchem_preproccessed.RDS",
+        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
     conda:
         "envs/sample_annotation.yaml",
     script:
-        "scripts/getPubchem_{wildcards.dataset}.R"
+        "scripts/getPubChem/getPubChem_{wildcards.dataset}.R"
 
+rule getChEMBLAnnotations:
+    input:
+        CIDtoCHEMBL = expand("procdata/{dataset}/pubchem_annotations_{annotationType}.RDS", dataset = DATASETS, annotationType = ['ChEMBL ID']),
+    output:
+        allChEMBLMechanisms = "procdata/{dataset}/ChEMBL_mechanisms.csv"
+    conda:
+        "envs/sample_annotation.yaml",
+    script:
+        "scripts/getChEMBL/getChEMBLAnnotations.R"
 
-# rule getTreatmentMetadata:
-#     input:
-#         treatment_Pubchem_data = "results/{dataset}/pubchem_preproccessed.RDS",
+# rule getPubchemAnnotationQueryDatabase:
 #     output:
-#         treatmentInfo_file = "results/{dataset}/treatment_metadata.RDS",
+#         pubchem_annotation_db = expand("procdata/pubchem_annotations_{query}.RDS", query = pubchemAnnotationQueries)
 #     conda:
 #         "envs/sample_annotation.yaml",
+#     threads:
+#         10
+#     params:
+#         raw = "FALSE",
+#         rawAnnotationDT = "TRUE",
+#         maxPages = "5",
+#         verbose = "TRUE"
 #     script:
-#         "scripts/getTreatmentMetadata_{wildcards.dataset}.R"
+#         "scripts/getPubchemAnnotations.R"
