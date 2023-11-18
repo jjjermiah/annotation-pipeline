@@ -1,32 +1,32 @@
 
 ## ------------------- Parse Snakemake Object ------------------- ##
 if(exists("snakemake")){
-    input <- snakemake@input[['treatment_Pubchem_data']]
-
+    inputfile <- snakemake@input[['mappedCIDs']]
     outputFile <- snakemake@output[['pubchem_properties']]
-}else{
-    input <- "/home/bioinf/bhklab/jermiah/projects/annotationScripts/procdata/ctrp/pubchem_preproccessed.RDS"
+
+    dataset_name <- snakemake@wildcards[['dataset']]           
+
+    THREADS <- snakemake@threads
+    snakemake@source("newfunctions.R")
+    save.image()
 }
 
-data <- readRDS(input)
-
-CIDS <- 
-    unlist(
-        lapply(
-            data$successful_master_cpd_ids$cids, 
-            function(x) ifelse(is.null(x) || is.null(unlist(x)), NA, x)))
-CIDS <- CIDS
+data <- readRDS(inputfile)
+mapped_cids <- data[[paste0(dataset_name, ".successful.mapped.cids")]][!is.na("cids")]
 
 # TODO::ADD BPPARAM HERE
 propertiesFromCID <- 
     AnnotationGx::getPubChemCompound(
-        CIDS, 
+        mapped_cids[, cids], 
         from='cid', 
         to='property', 
         properties=c('Title', 'MolecularFormula', 'InChIKey', 'CanonicalSMILES'))
 
-
-CIDtoSynonyms <- AnnotationGx::getPubChemCompound(CIDS, from='cid', to='synonyms')
+CIDtoSynonyms <- 
+    AnnotationGx::getPubChemCompound(
+        mapped_cids[, cids], 
+        from='cid', 
+        to='synonyms')
 # CIDtoSIDs <- AnnotationGx::getPubChemCompound(CIDS, from='cid', to='sids')
 
 # merge synonyms and properties

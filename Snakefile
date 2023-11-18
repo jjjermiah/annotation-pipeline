@@ -5,7 +5,7 @@ from os.path import join
 dataset_annotation_dict = {
     'ccle': {
         'sample': 'rawdata/ccle/Cell_lines_annotations_20181226.txt',
-        'treatment': 'rawdata/ccle/CCLE_NP24.2009_Drug_data_2015.02.24.csv'
+        'treatment': 'rawdata/ccle/CCLE_NP24.2009_profiling_2012.02.20.csv'
     },
     'ctrp': {
         'sample': 'rawdata/ctrp/v20.meta.per_cell_line.txt',
@@ -18,11 +18,12 @@ dataset_annotation_dict = {
 }
 
 pubchemAnnotationQueries = ['ATC Code', 'NSC Number', 'ChEMBL ID', 'Drug Induced Liver Injury', 'CAS']
-DATASETS = "ctrp" #["ccle", "ctrp", "gdsc"]
+# DATASETS = "ctrp" #["ccle", "ctrp", "gdsc"]
+DATASETS= ["ccle", "ctrp"]
 rule all:
     input:
         treatmentMetadata = expand("procdata/{dataset}/pubchem_annotations_all.csv", dataset = DATASETS), #"results/ctrp/treatment_metadata.RDS",
-        sampleMetadata = expand("results/ctrp/sample_metadata.RDS", dataset = "ctrp"),
+        # sampleMetadata = expand("results/ctrp/sample_metadata.RDS", dataset = "ctrp"),
 
 rule combineSampleCellosaurusMetadata:
     input:
@@ -67,7 +68,7 @@ rule combinePubchemAnnotations:
 
 rule getExternalAnnotationFromCID:
     input:
-        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
+        mappedCIDs = "procdata/{dataset}/pubchem_preproccessed.RDS",
     output:
         pubchem_annotation_dbs = "procdata/{dataset}/pubchem_annotations_{annotationType}.RDS"
     threads: 10
@@ -78,7 +79,7 @@ rule getExternalAnnotationFromCID:
 
 rule getPropertiesFromCID:
     input:
-        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
+        mappedCIDs = "procdata/{dataset}/pubchem_preproccessed.RDS",
     output:
         pubchem_properties = "procdata/{dataset}/pubchem_properties.RDS"
     threads: 10
@@ -89,13 +90,15 @@ rule getPropertiesFromCID:
 
 rule mapTreatmentNamesToPubchemCID:
     input:
-        dataset_annotation_file = lambda wildcards: dataset_annotation_dict[wildcards.dataset]['treatment']
+        dataset_treatment_metadata_file = lambda wildcards: dataset_annotation_dict[wildcards.dataset]['treatment']
     output:
-        treatment_Pubchem_data = "procdata/{dataset}/pubchem_preproccessed.RDS",
+        mappedCIDs = "procdata/{dataset}/pubchem_preproccessed.RDS",
+    threads: 
+        10
     conda:
         "envs/sample_annotation.yaml",
     script:
-        "scripts/getPubChem/getPubChem_{wildcards.dataset}.R"
+        "scripts/getPubChem/getPubChemCIDs_{wildcards.dataset}.R"
 
 rule getChEMBLAnnotations:
     input:
