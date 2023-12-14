@@ -1,7 +1,7 @@
 
 from os.path import join
 # manually create the dictionary for each project's annotation file
-# TODO:: moved into config.yaml file later
+# TODO:: move into config.yaml file later
 dataset_annotation_dict = {
     'ccle': {
         'sample': 'rawdata/ccle/Cell_lines_annotations_20181226.txt',
@@ -19,11 +19,11 @@ dataset_annotation_dict = {
 
 pubchemAnnotationQueries = ['ATC Code', 'NSC Number', 'ChEMBL ID', 'Drug Induced Liver Injury', 'CAS']
 # DATASETS = "ctrp" #["ccle", "ctrp", "gdsc"]
-DATASETS= ["ccle", "ctrp"]
+DATASETS= ["ccle", "ctrp", "gdsc"]
 rule all:
     input:
-        treatmentMetadata = expand("procdata/{dataset}/pubchem_annotations_all.csv", dataset = DATASETS), #"results/ctrp/treatment_metadata.RDS",
-        # sampleMetadata = expand("results/ctrp/sample_metadata.RDS", dataset = "ctrp"),
+        treatmentMetadata = expand("results/{dataset}/pubchem_annotations_all.csv", dataset = DATASETS), 
+        sampleMetadata = expand("results/ctrp/sample_metadata.RDS", dataset = DATASETS),
 
 rule combineSampleCellosaurusMetadata:
     input:
@@ -60,7 +60,7 @@ rule combinePubchemAnnotations:
         pubchem_annotation_db = expand("procdata/{dataset}/pubchem_annotations_{annotationType}.RDS", dataset = DATASETS,  annotationType = pubchemAnnotationQueries),
         pubchem_properties = "procdata/{dataset}/pubchem_properties.RDS"
     output:
-        pubchemTreatmentAll = "procdata/{dataset}/pubchem_annotations_all.csv"
+        pubchemTreatmentAll = "results/{dataset}/pubchem_annotations_all.csv"
     conda:
         "envs/sample_annotation.yaml",
     script:

@@ -38,7 +38,7 @@ columns <- c(
     # "diseases", 
     "category", "samplingSite", "isCancer", 
     "oncotreeName", "oncotreeTissue", "oncotreeLevel",
-    "depmapId", "atccId", "ncbiTaxonomyId", "sangerModelId", "secondaryAccession",
+    "depmapId", "atccId", "ncbiTaxonomyId", "sangerModelId",
     "sexOfCell", "ageAtSampling"
 )
 
@@ -55,6 +55,7 @@ agx_results <-
         querydomain = "ac:"
     )
 cleaned <- AnnotationGx::cleanCellosaurusResponse(agx_results,GETfxn = "search/cell-line?")
+
 cleaned[, c("NCIt.ID", "NCIt.Name"):= tstrsplit(DI, split = ";")[2:3]][, DI:=NULL]
 
 merged_dt <-  merge(merged_dt, cleaned,  by.x="cellosaurus.accession.ID", by.y="cellLine", all.x=T, sort=T)

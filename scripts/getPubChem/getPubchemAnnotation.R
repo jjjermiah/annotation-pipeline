@@ -2,7 +2,7 @@ library(data.table)
 
 library(httr)
 library(jsonlite)
-## ------------------- Parse Snakemake Object ------------------- ##
+## ------------------- Parse Snakemake Object ------------------- ## v
 if(exists("snakemake")){
     inputfile <- snakemake@input[['mappedCIDs']]
     outputfile <- snakemake@output[['pubchem_annotation_dbs']]
@@ -37,7 +37,7 @@ result <-
     BiocParallel::bptry(
         BiocParallel::bplapply(
                 mapped_cids[, cids], 
-                function(CID) {as.data.table(getPubChemCHEMBL(CID, type = annotationType))},
+                function(CID) {as.data.table(AnnotationGx::getPubChemAnnotation(CID, header = annotationType))},
                 BPPARAM = BiocParallel::MulticoreParam(workers = THREADS, progressbar = TRUE, stop.on.error = FALSE)
         )
     )

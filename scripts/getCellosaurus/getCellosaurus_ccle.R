@@ -23,6 +23,7 @@ cellosaurusData <- as.data.table(object)
 
 # First use depmapID to map to cellosaurus.accession.ID
 mapped_depmap <- as.data.table(mapCells(object, cells = ccle[!is.na(ccle$depMapID),depMapID]), keep.rownames=T)
+
 # merge mapped_depmap with ccle to get the CCLE_ID 
 mapped_depmap <- merge(mapped_depmap, ccle, by.x = "V1", by.y = "depMapID", all.y=T)[,c("CCLE_ID", "V2")]
 
